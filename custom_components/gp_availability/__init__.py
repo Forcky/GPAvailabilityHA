@@ -21,9 +21,12 @@ from .providers import PROVIDERS
 PLATFORMS = [
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
+    Platform.DATE,
     Platform.NUMBER,
+    Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
+    Platform.TIME,
 ]
 
 type GpAvailabilityConfigEntry = ConfigEntry[GpAvailabilityCoordinator]
@@ -37,7 +40,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: GpAvailabilityConfigEntr
     provider = provider_cls(async_get_clientsession(hass))
     coordinator = GpAvailabilityCoordinator(hass, entry, provider)
     await coordinator.async_load()
-    await coordinator.async_config_entry_first_refresh()
+    # Paused (the Checking switch is off): no request at all until it is turned on.
+    if coordinator.polling:
+        await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
 
     # Doctor devices hang off the practice device, so it must exist first.

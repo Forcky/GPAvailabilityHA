@@ -35,4 +35,6 @@ STORAGE_VERSION = 1
 
 # How many slots to list in a notification / entity attributes.
 NOTIFY_MAX_SLOTS = 5
+# Book buttons (one per new slot with its own booking link) per notification.
+NOTIFY_MAX_ACTIONS = 3
 ATTR_MAX_SLOTS = 10

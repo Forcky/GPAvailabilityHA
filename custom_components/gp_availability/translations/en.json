@@ -66,10 +66,32 @@
       "slot_before_cutoff": { "name": "Slot before cutoff" }
     },
     "button": {
-      "test_notification": { "name": "Send test notification" }
+      "test_notification": { "name": "Send test notification" },
+      "reset_window": { "name": "Reset preferred window" }
+    },
+    "date": {
+      "from_date": { "name": "Preferred from date" },
+      "until_date": { "name": "Preferred until date" }
     },
     "number": {
       "cutoff_days": { "name": "Cutoff" }
+    },
+    "select": {
+      "preferred_days": {
+        "name": "Preferred days",
+        "state": {
+          "any": "Any day",
+          "weekdays": "Weekdays",
+          "weekends": "Weekends",
+          "monday": "Monday",
+          "tuesday": "Tuesday",
+          "wednesday": "Wednesday",
+          "thursday": "Thursday",
+          "friday": "Friday",
+          "saturday": "Saturday",
+          "sunday": "Sunday"
+        }
+      }
     },
     "sensor": {
       "next_available": { "name": "Next available" },
@@ -77,7 +99,12 @@
       "last_checked": { "name": "Last checked" }
     },
     "switch": {
-      "notifications": { "name": "Notifications" }
+      "notifications": { "name": "Notifications" },
+      "checking": { "name": "Checking" }
+    },
+    "time": {
+      "earliest_time": { "name": "Preferred earliest time" },
+      "latest_time": { "name": "Preferred latest time" }
     }
   }
 }

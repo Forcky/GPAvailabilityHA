@@ -20,9 +20,12 @@ HealthEngine is next on the [roadmap](docs/roadmap.md).
 
 - **No login needed.** It reads the same public availability the booking page shows.
 - **Watch as many doctors as you like**, each with their own cutoff, plus an optional *Any doctor* watch.
+- **Preferred window.** Only hear about the slots you can make: certain days (e.g. Wednesdays), a time range, or specific dates ("only next Wednesday").
+- **One tap to book.** On HotDoc, alerts open the exact slot and carry *Book* buttons for the new slots. Nothing is ever booked for you.
 - **Announces each slot once.** If someone books a slot and it later reopens, you hear about it again.
 - **Urgent alerts.** Notifications are sent high priority / time-sensitive, so a sleeping phone shows them straight away.
 - **Automation-friendly.** Every new slot fires a `gp_availability_slot_available` event.
+- **Pause any time.** A per-practice *Checking* switch stops all requests until you need it again.
 - **Handles Tasmanian daylight saving** and other Australian time zones.
 
 > Not affiliated with HotDoc, EasyVisit or Sonic Healthcare. It uses undocumented APIs that may change without notice. It is for personal use: it only reads availability, never books, and checks gently (HotDoc every 10 minutes by default). Please keep it that way.
@@ -42,11 +45,14 @@ Coming from *EasyVisit GP Availability* 0.1.x? See [moving from EasyVisit GP Ava
 | Entity | Description |
 |---|---|
 | **Next available** | The earliest open slot (timestamp), with the next 10 slots and the doctor's notes as attributes |
-| **Slots before cutoff** | How many open slots fall on or before the cutoff date |
-| **Slot before cutoff** | Binary sensor, on when anything is open before the cutoff |
+| **Slots before cutoff** | How many open slots count: on or before the cutoff (or until date) and inside the preferred window |
+| **Slot before cutoff** | Binary sensor, on when any slot counts |
 | **Cutoff** | Days ahead that count as soon enough (default 14; *Any doctor* defaults to 2) |
 | **Notifications** | Turn alerts for this doctor on or off |
-| **Send test notification** | Sends what is open before the cutoff right now |
+| **Preferred days / earliest time / latest time / from date / until date** | The preferred window; **Reset preferred window** clears it |
+| **Send test notification** | Sends what counts right now |
+
+Per practice: **Last checked**, and **Checking** to pause all checks.
 
 ## Documentation
 

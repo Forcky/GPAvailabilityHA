@@ -254,7 +254,7 @@ class HotDocProvider(Provider):
                 when = _parse_time(raw.get("start_time"), tz)
                 if did is None or when is None or (doctor_ids is not None and did not in doctor_ids):
                     continue
-                slot = Slot(when, did, result.doctors[did].name)
+                slot = Slot(when, did, result.doctors[did].name, url=raw.get("link") or None)
                 found[slot.key] = slot
             if first:
                 # Only doctors with nothing in the window get next_available.

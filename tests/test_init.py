@@ -127,6 +127,7 @@ async def test_new_slot_notifies_once_and_again_after_reopening(
     assert call["data"]["priority"] == "high"
     assert call["data"]["ttl"] == 0
     assert call["data"]["push"] == {"interruption-level": "time-sensitive"}
+    assert "actions" not in call["data"]  # EasyVisit has no per-slot booking links
     assert {e.data["watch_id"] for e in events} == {"2001", ANY_DOCTOR}
     assert hass.states.get(f"{MORGAN}_slots_before_cutoff").state == "1"
 
@@ -196,6 +197,22 @@ async def test_settings_survive_reload(hass: HomeAssistant, setup):
     )
     await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": "select.alex_morgan_preferred_days", "option": "wednesday"},
+        blocking=True,
+    )
+    await hass.services.async_call(
+        "time",
+        "set_value",
+        {"entity_id": "time.alex_morgan_preferred_earliest_time", "time": "09:30"},
+        blocking=True,
+    )
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get("select.alex_morgan_preferred_days").state == "wednesday"
+    assert hass.states.get("time.alex_morgan_preferred_earliest_time").state == "09:30:00"
     assert hass.states.get("number.alex_morgan_cutoff").state == "21"
 
 
@@ -312,3 +329,111 @@ async def test_hotdoc_new_slot_notifies(hass: HomeAssistant, hotdoc, freezer):
     assert [e.data["provider"] for e in events] == ["hotdoc"]
     assert events[0].data["watch_id"] == "3003"
     assert events[0].data["new_slots"][0]["start"] == "2026-10-06T09:00:00+11:00"
+
+
+# ---- preferred window -------------------------------------------------------
+
+
+async def _set(hass: HomeAssistant, domain: str, service: str, entity_id: str, **data) -> None:
+    await hass.services.async_call(domain, service, {"entity_id": entity_id, **data}, blocking=True)
+    await hass.async_block_till_done()
+
+
+async def test_window_entities_default_to_anything(hass: HomeAssistant, setup):
+    assert hass.states.get("select.alex_morgan_preferred_days").state == "any"
+    assert hass.states.get("time.alex_morgan_preferred_earliest_time").state == "00:00:00"
+    assert hass.states.get("time.alex_morgan_preferred_latest_time").state == "23:59:00"
+    assert hass.states.get("date.alex_morgan_preferred_from_date").state == "unknown"
+    assert hass.states.get("date.alex_morgan_preferred_until_date").state == "unknown"
+    assert hass.states.get("button.alex_morgan_reset_preferred_window") is not None
+    attrs = hass.states.get(f"{MORGAN}_slots_before_cutoff").attributes
+    assert attrs["window"] == "Any time"
+    assert attrs["cutoff"] == "2026-10-11"
+
+
+async def test_preferred_day_filters_alerts(hass: HomeAssistant, setup, freezer):
+    _, notify, _, resources = setup
+    await _set(hass, "select", "select_option", "select.alex_morgan_preferred_days", option="wednesday")
+    _add_slot(resources, 2001, "2026-09-29T09:00:00")  # a Tuesday
+    await _poll(hass, freezer)
+    assert notify == []
+    assert hass.states.get(f"{MORGAN}_slots_before_cutoff").state == "0"
+    _add_slot(resources, 2001, "2026-09-30T09:00:00")  # a Wednesday
+    await _poll(hass, freezer)
+    assert len(notify) == 1
+    assert notify[0].data["message"] == "Wed 30 Sep 09:00"
+    assert hass.states.get(f"{MORGAN}_slots_before_cutoff").attributes["window"] == "Wednesdays"
+
+
+async def test_until_date_replaces_cutoff_and_reset_restores_it(
+    hass: HomeAssistant, setup, freezer
+):
+    _, notify, _, _ = setup
+    # Dr Morgan's first slot is 26 Oct 13:45, beyond the 14-day cutoff.
+    await _set(hass, "date", "set_value", "date.alex_morgan_preferred_until_date", date="2026-10-26")
+    assert len(notify) == 1
+    assert notify[0].data["title"] == "Alex Morgan: 1 new slot by Mon 26 Oct"
+    sensor = hass.states.get(f"{MORGAN}_slots_before_cutoff")
+    assert sensor.state == "1"
+    assert sensor.attributes["window"] == "until Mon 26 Oct"
+
+    await _set(hass, "button", "press", "button.alex_morgan_reset_preferred_window")
+    # The setting shows at once; the recheck waits out the refresh cooldown.
+    assert hass.states.get("date.alex_morgan_preferred_until_date").state == "unknown"
+    freezer.tick(timedelta(seconds=11))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get(f"{MORGAN}_slots_before_cutoff").state == "0"
+    assert len(notify) == 1
+
+
+async def test_earliest_time_filters(hass: HomeAssistant, setup, freezer):
+    _, notify, _, resources = setup
+    await _set(hass, "time", "set_value", "time.alex_morgan_preferred_earliest_time", time="10:00")
+    _add_slot(resources, 2001, "2026-09-29T09:00:00")
+    await _poll(hass, freezer)
+    assert notify == []
+
+
+# ---- pause checking (issue #7) and Book buttons -------------------------------
+
+
+async def test_checking_switch_stops_all_requests(hass: HomeAssistant, hotdoc, freezer):
+    entry, notify, _, fake = hotdoc
+    calls = len(fake.calls)
+    switch = "switch.example_medical_centre_checking"
+    assert hass.states.get(switch).state == "on"
+
+    await _set(hass, "switch", "turn_off", switch)
+    for _ in range(3):
+        freezer.tick(timedelta(minutes=10, seconds=1))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+    # Settings can still change while paused, without a check.
+    await _set(hass, "number", "set_value", "number.dr_casey_nguyen_cutoff", value=7)
+    assert len(fake.calls) == calls
+
+    # Paused survives a reload (and a restart): not even the startup check runs.
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert len(fake.calls) == calls
+    assert hass.states.get(switch).state == "off"
+
+    await _set(hass, "switch", "turn_on", switch)
+    assert len(fake.calls) > calls  # checked straight away
+    assert hass.states.get(f"{CASEY}_next_available").state == "2026-09-30T01:45:00+00:00"
+
+
+async def test_hotdoc_alert_opens_the_slot(hass: HomeAssistant, hotdoc, freezer):
+    _, notify, events, fake = hotdoc
+    link = "https://www.hotdoc.com.au/request/consult/start?defaults=practice-x,practitioner-dr-taylor-brooks,when-1"
+    fake.add_slot("41003", "2026-10-06T09:00:00+11:00", link)
+    fake.add_slot("41003", "2026-10-07T09:00:00+11:00")  # no link: no button
+    freezer.tick(timedelta(minutes=10, seconds=1))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+    data = notify[0].data["data"]
+    assert data["clickAction"] == data["url"] == link
+    assert data["actions"] == [{"action": "URI", "title": "Book Tue 6 Oct 09:00", "uri": link}]
+    assert events[0].data["new_slots"][0]["booking_url"] == link

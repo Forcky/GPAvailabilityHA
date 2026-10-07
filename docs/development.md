@@ -13,7 +13,7 @@ custom_components/gp_availability/
   coordinator.py  DataUpdateCoordinator: one provider.fetch per poll, per-watch data,
                   announcements (event + notify services), settings in a Store
   entity.py       per-watch device (via_device_id -> practice device)
-  sensor.py  binary_sensor.py  number.py  switch.py  button.py
+  sensor.py  binary_sensor.py  number.py  switch.py  button.py  select.py  time.py  date.py
   config_flow.py  link -> appointment type -> doctors/notify/interval; options flow
 ```
 

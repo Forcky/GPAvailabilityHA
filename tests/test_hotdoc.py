@@ -97,6 +97,10 @@ async def test_slots_map_by_availability_type(hass: HomeAssistant, api):
     first = found.slots[0]
     assert first.start == dt.datetime(2026, 9, 30, 11, 45, tzinfo=HOBART)
     assert first.resource_name == "Dr Casey Nguyen"
+    assert first.url == (
+        "https://www.hotdoc.com.au/request/consult/start"
+        "?defaults=practice-example-medical-centre,practitioner-dr-casey-nguyen"
+    )
     assert found.doctors["3001"].next_available == first.start
     assert found.doctors["3001"].url.endswith("/doctors/dr-casey-nguyen")
 
