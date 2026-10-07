@@ -6,33 +6,17 @@ HealthEngine is the second-largest GP booking site in Australia. Its practice pa
 
 Also seen at Australian GPs, less often: AutoMed (server-rendered pages that need a session cookie), and Halaxy (open JSON, but mostly allied health).
 
-## Phase 2: opt-in auto-booking (EasyVisit first)
+## Not planned: automatic booking
 
-Book the earliest qualifying slot automatically, only when you switch it on.
+Researched in October 2026 (details in [API.md](../API.md#booking-research-not-used)) and dropped, because neither site can be booked automatically without defeating its protections:
 
-**Planned design:**
+- **EasyVisit:** every booking, including for signed-in users, carries a reCAPTCHA v3 token produced in the browser. There is no list of your appointments to guard against double booking, and cancelling needs the token from the confirmation email plus an SMS code.
+- **HotDoc:** booking only works for clients that present HotDoc's own web-app headers. It also needs an emailed login code and a password re-check, and clinics can add questions before booking.
 
-- **Connect account (options flow).** Sign in to EasyVisit (Sonic Healthcare ID) in your browser, then paste back the redirected URL. This is an OAuth code + PKCE exchange. The integration stores the access and refresh tokens and refreshes them automatically. If the refresh token stops working, Home Assistant asks you to sign in again.
-- **Per doctor:**
-  - an **Auto-book** switch (default off)
-  - a **Patient** select: you or a family member on your account
-- **When a new qualifying slot appears and Auto-book is on:**
-  1. Lock the earliest slot. If it's taken, try the next one, up to 3 times.
-  2. Check the patient has no other booking that day. If they do, notify instead of booking.
-  3. Book, and notify with the details. Some doctors need the practice to confirm web bookings.
-  4. **Turn Auto-book off**, so there is never a second booking.
-- Existing appointments are never cancelled.
-
-**Open questions:**
-- What the `Token` field on the EasyVisit booking request needs for signed-in users.
-- How long the web client's refresh tokens last. If they're short, the mobile app's client may be needed.
-- HotDoc currently marks every reason unbookable for non-browser clients ("extra screening measures"), so auto-booking there is unlikely.
-
-See the booking section of [API.md](../API.md).
+What the integration does instead: the [preferred window](configuration.md#preferred-window) narrows alerts to the slots you can make, and on HotDoc each alert opens the exact slot with **Book** buttons, so booking takes a tap or two.
 
 ## Ideas
 
-- Time-of-day and weekday filters (e.g. only mornings, or never Fridays)
 - Quiet hours for notifications
-- Actionable notification buttons (Book / Snooze)
-- Per-slot deep links on HotDoc (each slot has its own booking link)
+- Several preferred windows per doctor (e.g. Wednesday mornings *or* Friday afternoons)
+- Snooze for a doctor until a date

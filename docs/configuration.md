@@ -44,17 +44,22 @@ Each watched doctor is a device, grouped under the practice device.
 
 | Entity | Type | Notes |
 |---|---|---|
-| `sensor.<doctor>_next_available` | timestamp | The earliest open slot. Attributes: `open_slots`, `next_slots` (up to 10 × `{doctor, resource_id, start}`), `booking_url`, `notes`, and `manual_confirm` (EasyVisit only) |
-| `sensor.<doctor>_slots_before_cutoff` | count | Attributes: `cutoff` (date), `slots` (up to 10) |
-| `binary_sensor.<doctor>_slot_before_cutoff` | on/off | On when anything is open on or before the cutoff date |
-| `number.<doctor>_cutoff` | days (0–60) | See below |
-| `switch.<doctor>_notifications` | on/off | Mutes notify services for this doctor. The event still fires. |
-| `button.<doctor>_send_test_notification` | button | Sends what is open before the cutoff now, marked `[Test]` |
+| `sensor.<doctor>_next_available` | timestamp | The earliest open slot (ignores the preferred window). Attributes: `open_slots`, `next_slots` (up to 10 × `{doctor, resource_id, start, booking_url}`), `booking_url`, `notes`, and `manual_confirm` (EasyVisit only) |
+| `sensor.<doctor>_slots_before_cutoff` | count | Open slots that count: up to the last day, inside the preferred window. Attributes: `cutoff` (the last day that counts), `window` (e.g. `Wednesdays, 09:00–12:00`), `slots` (up to 10) |
+| `binary_sensor.<doctor>_slot_before_cutoff` | on/off | On when any slot counts |
+| `number.<doctor>_cutoff` | days (0–60) | See [Choosing a cutoff](#choosing-a-cutoff) |
+| `select.<doctor>_preferred_days` | Any day / Weekdays / Weekends / Monday … Sunday | See [Preferred window](#preferred-window) |
+| `time.<doctor>_preferred_earliest_time`, `time.<doctor>_preferred_latest_time` | time | Earliest and latest start time, inclusive (default 00:00–23:59) |
+| `date.<doctor>_preferred_from_date`, `date.<doctor>_preferred_until_date` | date | Optional first and last day. Unknown = not set. |
+| `button.<doctor>_reset_preferred_window` | button | Back to any day, any time, no dates |
+| `switch.<doctor>_notifications` | on/off | Mutes notify services for this doctor. Checks carry on and the event still fires. |
+| `button.<doctor>_send_test_notification` | button | Sends what counts right now, marked `[Test]` |
+| `switch.<practice>_checking` | on/off | Off pauses the whole practice: no requests at all. See [Pausing checks](#pausing-checks). |
 | `sensor.<practice>_last_checked` | timestamp | Diagnostic: when availability was last fetched |
 
-On HotDoc, only slots up to the longest cutoff are fetched, so `open_slots` and `next_slots` stop there. **Next available** still shows the doctor's next opening beyond it, because HotDoc reports that separately.
+On HotDoc, only slots up to the latest last day are fetched, so `open_slots` and `next_slots` stop there. **Next available** still shows the doctor's next opening beyond it, because HotDoc reports that separately.
 
-The cutoff and notification settings are kept by the integration itself. They survive restarts and don't reload anything when you change them.
+All these settings are kept by the integration itself. They survive restarts and don't reload anything when you change them. A change is checked straight away, so slots that now count are announced.
 
 ## Choosing a cutoff
 
@@ -73,9 +78,42 @@ Tips:
 - The cutoff rolls forward each day. Slots already open that come inside the window are announced when they do.
 - *Any doctor* at a busy practice can have hundreds of slots a fortnight out. That's why it defaults to 2 days with notifications off.
 
+## Preferred window
+
+Narrow down which slots count, per doctor (or for *Any doctor*). Everything else then ignores slots outside the window: alerts, the event, **Slots before cutoff** and **Slot before cutoff**.
+
+| Setting | Effect |
+|---|---|
+| **Preferred days** | Any day, Weekdays, Weekends, or one day of the week |
+| **Preferred earliest / latest time** | The slot must *start* between these times (inclusive). If earliest is after latest, the window runs overnight. |
+| **Preferred from date** | Ignore slots before this day |
+| **Preferred until date** | The last day that counts. **When set, it replaces the cutoff.** |
+| **Reset preferred window** | Clears all of the above |
+
+Examples:
+- **Only next Wednesday:** set both dates to that Wednesday.
+- **Wednesday mornings, any week:** Preferred days *Wednesday*, latest time *12:00*. The cutoff still limits how far ahead.
+- **Any GP after school, within a week:** on the *Any doctor* watch set Preferred days *Weekdays*, earliest time *15:30*, cutoff *7*, and turn its Notifications on.
+
+Once the until date has passed, nothing counts. The `window` attribute shows `(passed)`. This is deliberate, so an expired "only that Wednesday" doesn't quietly widen to any day. Change the date or press **Reset preferred window**.
+
+The integration only alerts; it never books. Booking automatically isn't possible without defeating the booking sites' protections. On HotDoc, the alert's **Book** buttons open that exact slot, so booking takes a tap or two.
+
+## Pausing checks
+
+The **Notifications** switch only mutes the alerts. Checks carry on, because the sensors and the event still update. To stop checking a practice altogether, turn off its **Checking** switch (on the practice's device). While it's off:
+
+- No requests are made, not even when Home Assistant starts.
+- Settings can still be changed; they are applied when checking resumes.
+- The sensors keep their last values until a restart, then show unknown.
+
+Turning it back on checks straight away. Home Assistant's own **⋮ → System options → Enable polling for changes** and **⋮ → Disable** do much the same for the whole entry.
+
 ## Defaults
 
 | Setting | Doctor | Any doctor |
 |---|---|---|
 | Cutoff | 14 days | 2 days |
 | Notifications | on | off |
+| Preferred window | any day, any time, no dates | the same |
+| Checking (per practice) | on | |

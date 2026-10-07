@@ -4,8 +4,8 @@
 
 Each check (default every 10 minutes on HotDoc, 5 on EasyVisit):
 
-1. Fetch the open slots for the appointment type, at least up to the longest cutoff.
-2. For each watched doctor, find the slots **on or before the cutoff date**.
+1. Fetch the open slots for the appointment type, at least up to the latest last day across watches.
+2. For each watched doctor, find the slots **on or before the last day** (the cutoff, or the preferred until date) that fall inside the [preferred window](configuration.md#preferred-window).
 3. Compare them with the slots already announced. **Only new ones are announced.**
 4. Forget any slot that has gone (someone booked it), so it is announced again if it reopens.
 
@@ -24,7 +24,8 @@ Wed 30 Sep 14:15
 
 - Up to 5 slots are listed, then "+N more". If other slots before the cutoff were already open, a line like "(4 open by Sun 11 Oct in total)" is added.
 - *Any doctor* alerts include the doctor's name on each line.
-- The notification includes `url` / `clickAction`, so tapping it in the HA companion app opens the booking page.
+- Tapping it opens the booking page: on HotDoc the first new slot's own booking page, otherwise the doctor's or practice's page (`url` / `clickAction`).
+- On HotDoc it also has up to 3 **Book** buttons, one per new slot (e.g. *Book Tue 6 Oct 09:00*), each opening that slot's booking page. EasyVisit has no per-slot links, so its alerts have no buttons.
 - It also sets `tag` (so a newer alert replaces the older one for the same doctor) and `group: gp_availability`.
 - It is sent as urgent, so it arrives straight away even when the phone is asleep: `priority: high` and `ttl: 0` on Android, and `push: {interruption-level: time-sensitive}` on iOS, which also lets it through Focus modes that allow time-sensitive alerts. It does not break through Android Do Not Disturb; for that, use the automation below.
 
@@ -46,10 +47,11 @@ data:
   new_slots:
     - doctor: Dr Alex Morgan
       resource_id: "2001"
+      booking_url: https://www.hotdoc.com.au/request/consult/start?defaults=...   # HotDoc only
       start: "2026-09-29T09:00:00+10:00"
 ```
 
-`booking_url` is the doctor's own page when the site has one (HotDoc), otherwise the practice's booking page.
+`booking_url` is the doctor's own page when the site has one (HotDoc), otherwise the practice's booking page. Each slot in `new_slots` also has its own `booking_url` on HotDoc.
 
 ## Example automations
 

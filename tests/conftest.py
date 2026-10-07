@@ -90,9 +90,9 @@ class FakeHotDoc:
         ]
         return body
 
-    def add_slot(self, availability_type_id: str, start: str) -> None:
+    def add_slot(self, availability_type_id: str, start: str, link: str | None = None) -> None:
         self.slots["time_slots"].append(
-            {"start_time": start, "availability_type_id": availability_type_id}
+            {"start_time": start, "availability_type_id": availability_type_id, "link": link}
         )
 
 

@@ -102,15 +102,41 @@ photoData (base64, large), bio, ...
 - A doctor with nothing open still appears, with `availableSlotDates: []` and `nextAvailableSlot: null`.
 - `manualConfirm: true` means the practice must approve a web booking before it is confirmed.
 
-## Booking (authenticated; not used yet, for phase 2)
+# Booking research (not used)
 
-The web app sends `Authorization: Bearer <accessToken>` (from the OIDC code + PKCE flow) and `Content-Type: application/json`.
+Worked out in October 2026 from each site's web app, without signing in or booking. Automatic booking was dropped, because neither site can be booked without defeating its protections (see [roadmap](docs/roadmap.md#not-planned-automatic-booking)). It is kept here so nobody has to redo it.
 
-1. `POST /api/v1/Booking/SlotLock` `{dateTime, resourceID, locationID[, oldLockID]}` → `Data.lockID`. HTTP 409 means the slot is already taken.
-2. `POST /api/v1/Booking/ValidateMultipleBooking` `{dateTime, locationId, familyMemberId}` → `Data` is `"true"` if the patient already has a booking that day.
-3. `GET /api/v1/User` (the account holder), `GET /api/V1/user/related` (family members, used for `FamilyMemberId`).
-4. `POST /api/v3/Booking` `{dateTime, resourceID, locationID, appointmentTypeID, lockID, FamilyMemberId, contactNumber, contactEmail, contactName, MultipleAptBookingNotes, Token, AppointmentBookedFrom: "Web"}` → `Data.isManualConfirm`.
+## EasyVisit
 
-Still unknown: what `Token` must hold for a signed-in booking. For guest bookings it appears to be a reCAPTCHA token. Signed-in users don't see a captcha, so it is probably empty. Confirm with one real booking.
+- **Sign-in:** OIDC authorization code + PKCE (S256) against `https://identity.apps.sonichealthcare.com/oxauth/restv1/authorize`, public client `eddb4e22-b4f9-479e-b079-e80b6ad2730e`, `redirect_uri` `https://web.easyvisit.com.au/login`, no `nonce`.
+  - The token exchange is a form POST to `/oxauth/restv1/token`.
+  - The web app keeps only the access and id tokens. It discards any refresh token, and a 401 sends you back to the start.
+  - The discovery document advertises no device-authorization endpoint.
+- **Requests:** API calls send `Authorization: Bearer <accessToken>`. There is no API key or device fingerprint.
+- **Booking sequence:**
+  1. `POST /api/v1/Booking/SlotLock` `{dateTime, resourceID, locationID[, oldLockID]}` → `Data.lockID`. HTTP 409 means the slot is already taken. There is no release call, only re-locking with `oldLockID`.
+  2. `POST /api/v1/Booking/ValidateMultipleBooking` `{dateTime: <the day>, locationId[, familyMemberId]}` → `"true"` if the patient already has a booking that day at that practice. The web app then asks for a reason, sent as `MultipleAptBookingNotes`.
+  3. `POST /api/v3/Booking` with `{dateTime, resourceID, locationID, appointmentTypeID, lockID, MultipleAptBookingNotes, Token, AppointmentBookedFrom: "Web"}`.
+     - **For yourself,** that's the whole body.
+     - **For a family member,** add `FamilyMemberId` plus `contactNumber` / `contactEmail` / `contactName` of the account holder.
+     - The response is `Data.isManualConfirm`.
+- **`Token` is a reCAPTCHA v3 token** from `recaptchaV3Service.execute("submit")`, for signed-in bookings too. That is why booking was dropped.
+- **People:** `GET /api/v1/User` (account holder) and `GET /api/V1/user/related` (`[{familyMemberId, familyMember: {...}}]`).
+- **No appointments list** in the web app. The only double-booking guard is the same-day check.
+- **Cancelling** works only from the confirmation email (`cancel-booking/:locationId/:appointmentId/:token`):
+  1. `GET /api/V1/Booking/AllowCancelAppointment`
+  2. `POST /api/v1/Booking/ValidateCancellationToken`, which sends an SMS
+  3. `POST /api/v1/Otp/ConfirmOTP`
+  4. `POST /api/v1/Booking/CancelAppoinmentByToken` (sic)
+- **Guests** use `POST /api/v2/Otp/GenerateOTP` (reCAPTCHA v2/v3) and `POST /api/v1/Otp/ConfirmOTP`.
 
-Other endpoints the web app uses: `POST /api/v2/Otp/GenerateOTP` (guest; reCAPTCHA v2/v3), `POST /api/v1/Otp/ConfirmOTP`, `POST /api/v1/Booking/CancelAppoinmentByToken` (sic), `GET /api/V1/Booking/AllowCancelAppointment`.
+## HotDoc
+
+- **Sign-in:** `POST /api/patient/login` `{patient: {authentication_key: <email>, password}}`. It is followed by a one-time code emailed to you (`authorization: totp <code>`), probably once per new device.
+  - The session comes back as `x-session-id` / `x-authentication-token` headers plus cookies. These are opaque tokens with no refresh.
+  - A 403 can send you to a password re-check (`/access-check`).
+- **Booking:** `POST /api/patient/appointments`, with `{appointment: {...doctor, reason, doctorReason, startTime, endTime, timeSlotId, patientIsNew, forDependent...}, stipulation_responses}`. Clinics can require answers to their own questions (`stipulations`).
+  - The web app then polls the appointment until it is `confirmed` / `auto_confirmed`.
+  - Server-side limits include `max_1_upcoming_appointment`, `overlaps_existing_appointment` and `too_close_to_appointment`.
+- **The "extra screening measures" gate** (`bookable: false` on every reason) lifts only when a request carries the web app's own headers: `app-platform: web`, `app-device-uuid`, `build-revision` and `app-version`. There is no captcha. Sending those would mean posing as HotDoc's app, which this integration won't do.
+- **Slot deep links:** each `time_slots[].link` (`/request/consult/start?defaults=practice-…,practitioner-…,when-…`) opens booking for that slot in the browser. The alerts' Book buttons use it.

@@ -6,10 +6,12 @@
    - If nothing arrives, the notify service is the problem. Check **Configure → Notify services**, and try the same service in Developer tools → Actions.
    - If it arrives, the integration and phone are fine. There simply hasn't been a *new* slot before the cutoff.
 2. Check that **Notifications** is on for that doctor. *Any doctor* starts off.
-3. Remember the **first check after adding a doctor is silent**. Slots already open are only announced once they reopen, or if you raise the cutoff to include them.
-4. Look at **Slots before cutoff**. If it's above 0, those slots have already been announced.
-5. On Android, check that the companion app is allowed to show notifications and isn't battery-restricted.
-6. Each doctor's alerts share one notification `tag`, so a new alert replaces the previous one in place instead of stacking. Swipe the old one away if you're unsure whether a new one arrived.
+3. Check the **Checking** switch on the practice device is on. When it's off nothing is checked; **Last checked** shows when the last check ran.
+4. Check the doctor's **preferred window**: the `window` attribute of **Slots before cutoff** shows it. A passed until date means nothing counts. **Reset preferred window** clears it.
+5. Remember the **first check after adding a doctor is silent**. Slots already open are only announced once they reopen, or if you raise the cutoff to include them.
+6. Look at **Slots before cutoff**. If it's above 0, those slots have already been announced.
+7. On Android, check that the companion app is allowed to show notifications and isn't battery-restricted.
+8. Each doctor's alerts share one notification `tag`, so a new alert replaces the previous one in place instead of stacking. Swipe the old one away if you're unsure whether a new one arrived.
 
 ## "Isn't a HotDoc or EasyVisit booking link" during setup
 

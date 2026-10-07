@@ -79,6 +79,7 @@ class SlotsBeforeCutoffSensor(GpAvailabilityWatchEntity, SensorEntity):
             return {}
         return {
             "cutoff": watch["cutoff"].isoformat(),
+            "window": watch["window"],
             "slots": [s.as_dict() for s in watch["qualifying"][:ATTR_MAX_SLOTS]],
         }
 

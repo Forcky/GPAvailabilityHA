@@ -19,8 +19,9 @@ Until 0.2.0 this was "EasyVisit GP Availability" (domain `easyvisit`, repo `Forc
 - `coordinator.py`: one `provider.fetch` per poll, up to the longest cutoff. It builds per-watch data and runs `_announce` (event + notify services).
   - Per-watch settings (`cutoff_days`, `notify`, `seen`) live in a `helpers.storage.Store`, **not** the config entry, so changing them from an entity doesn't reload the integration.
   - `seen: None` marks a watch that hasn't polled yet; that first poll is silent.
+  - Each watch also has a `window` (`slots.Window`: day preset, earliest/latest time, from/until dates; until replaces the cutoff). The top-level `polling` flag is the practice's Checking switch: off sets `update_interval = None`, skips the startup refresh, and `_async_update_data` returns the old data without a request.
 - `entity.py`: one device per watch (`<entry_id>_<doctor id>`, with `any` = any doctor), linked by `via_device_id` to a practice device that `__init__.py` creates first. `via_device` (identifier tuple) is deprecated since 2026.8, hence `hacs.json`'s minimum HA version.
-- Platforms: `sensor`, `binary_sensor`, `number` (cutoff), `switch` (notifications), `button` (test notification).
+- Platforms: `sensor`, `binary_sensor`, `number` (cutoff), `switch` (notifications per watch; Checking per practice), `button` (test notification, reset window), `select` (preferred days), `time` (earliest/latest), `date` (from/until).
 - `config_flow.py`: link → appointment type → doctors + notify targets + interval. The options flow edits the same fields and reloads. The watch list is stored in options as `{"<doctor id>": "<name>"}`.
 
 To add a booking site, follow "Adding a provider" in `docs/development.md`. HealthEngine is the next candidate (see `docs/roadmap.md`).
@@ -49,4 +50,4 @@ CI (`.github/workflows/validate.yml`) runs HACS, hassfest and pytest. hassfest r
 - HotDoc returns HTTP 500 for `time_slots` ranges much over 7 days, and marks every reason `bookable: false` for non-browser clients. Don't filter on `bookable`.
 - Be polite to the booking sites: personal, read-only, low-rate. Don't lower HotDoc's minimum interval, and don't disguise the User-Agent as a browser.
 - The Any-doctor watch at a busy practice has hundreds of qualifying slots. Keep it muted by default, with a short default cutoff.
-- Auto-booking (phase 2) must never double-book. Plan: lock → ValidateMultipleBooking → book → turn the auto-book switch off. See API.md for the unresolved `Token` field.
+- Automatic booking was researched and dropped: EasyVisit bookings carry a reCAPTCHA v3 token, and HotDoc only accepts its own web app's headers. Don't re-propose it without new facts (API.md, "Booking research"). HotDoc alerts carry per-slot Book links instead.
